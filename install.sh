@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [ "$(id -u)" -ne 0 ]; then
+  echo "This script must be run as root"
+  exit 1
+fi
+
 # Redirect all output (stdout & stderr) into the user’s home directory log
 # LOGFILE="${HOME}/fedora_setup.log"
 # : >"${LOGFILE}"
@@ -11,7 +16,6 @@ cd "$SCRIPT_DIR"
 
 # Variable set
 username=piyush
-CHROOT="fedora-42-x86_64"
 
 # Which type of install?
 # First choice: vm or hardware
@@ -63,195 +67,423 @@ fi
 
 # Install stuff
 # dnf mirror
-sudo tee -a /etc/dnf/dnf.conf <<EOF
+tee -a /etc/dnf/dnf.conf <<EOF
 fastestmirror=True
 deltarpm=True
 gpgcheck=True
 EOF
-sudo dnf clean all
-sudo dnf makecache
-sudo dnf upgrade --refresh
+dnf clean all
+dnf makecache
+dnf upgrade --refresh
 ## Adding repos
-sudo dnf install -y https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm
-sudo dnf install -y https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
-sudo dnf -y copr enable solopasha/hyprland
-sudo dnf -y copr enable maximizerr/SwayAura
-sudo dnf makecache
+dnf install -y https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-"$(rpm -E %fedora)".noarch.rpm
+dnf install -y https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-"$(rpm -E %fedora)".noarch.rpm
+dnf -y copr enable solopasha/hyprland
+dnf -y copr enable maximizerr/SwayAura
+dnf -y copr enable tschmitz/ananicy-cpp
+dnf -y copr enable erizur/firefox-esr
+dnf makecache
 
 # pacstrap of fedora
-xargs sudo dnf install -y <pkglist.txt
+xargs dnf install -y <pkglist.txt
 
-cd "$(mktemp -d)"
-# wikiman
-RPM_URL=$(curl -s https://api.github.com/repos/filiparag/wikiman/releases/latest |
-  grep "browser_download_url" |
-  grep -E "wikiman.*\.rpm" |
-  cut -d '"' -f 4)
-curl -LO "$RPM_URL"
-RPM_FILE="${RPM_URL##*/}"
-sudo dnf install -y "$RPM_FILE"
-# Iosevka
-mkdir -p ~/.local/share/fonts/iosevka
-cd ~/.local/share/fonts/iosevka
-curl -LO https://github.com/ryanoasis/nerd-fonts/releases/latest/download/IosevkaTerm.zip
-unzip IosevkaTerm.zip
-rm IosevkaTerm.zip
-# External
-python3 -m pip install --user unp
-cargo install starship --locked
-cargo install eza
-
-# Copy config and dotfiles as the user
-mkdir -p ~/Downloads ~/Documents ~/Public ~/Templates ~/Videos ~/Pictures/Screenshots ~/.config
-mkdir -p ~/Projects/work ~/Projects/sandbox
-mkdir -p ~/Knowledge/wiki ~/Knowledge/reference ~/Knowledge/notes
-mkdir -p ~/.local/bin ~/.cache/cargo-target ~/.local/state/bash ~/.local/state/zsh
-touch ~/.local/state/bash/history ~/.local/state/zsh/history
-
-git clone https://github.com/zedonix/scripts.git ~/Projects/personal/scripts
-git clone https://github.com/zedonix/dotfiles.git ~/Projects/personal/dotfiles
-git clone https://github.com/zedonix/archsetup.git ~/Projects/personal/archsetup
-git clone https://github.com/zedonix/notes.git ~/Projects/personal/notes
-git clone https://github.com/zedonix/GruvboxGtk.git ~/Projects/personal/GruvboxGtk
-git clone https://github.com/zedonix/GruvboxQT.git ~/Projects/personal/GruvboxQT
-git clone https://github.com/zedonix/fedora_setup.git ~/Projects/personal/fedora_setup
-git clone https://github.com/CachyOS/ananicy-rules.git ~/Downloads/ananicy-rules
-
-if [[ -d ~/Projects/personal/dotfiles ]]; then
-  cp ~/Projects/personal/dotfiles/.config/sway/archLogo.png ~/Pictures/ 2>/dev/null || true
-  cp ~/Projects/personal/dotfiles/pics/* ~/Pictures/ 2>/dev/null || true
-  cp -r ~/Projects/personal/dotfiles/.local/share/themes/Gruvbox-Dark ~/.local/share/themes/ 2>/dev/null || true
-  ln -sf ~/Projects/personal/dotfiles/.bashrc ~/.bashrc 2>/dev/null || true
-  ln -sf ~/Projects/personal/dotfiles/.zshrc ~/.zshrc 2>/dev/null || true
-
-  for link in ~/Projects/personal/dotfiles/.config/*; do
-    ln -sf "$link" ~/.config/ 2>/dev/null || true
-  done
-  for link in ~/Projects/personal/scripts/bin/*; do
-    ln -sf "$link" ~/.local/bin 2>/dev/null || true
-  done
+# Tlp setup
+# Robust detection: prefer explicit pstate driver dirs if present, fallback to scaling_driver text
+scaling_f="/sys/devices/system/cpu/cpu0/cpufreq/scaling_driver"
+pstate_supported=false
+driver=""
+if [ -d /sys/devices/system/cpu/intel_pstate ]; then
+  driver="intel_pstate"
+  pstate_supported=true
+elif [ -d /sys/devices/system/cpu/amd_pstate ] || [ -d /sys/devices/system/cpu/amd-pstate ]; then
+  # kernel docs and kernels may expose amd_pstate/amd-pstate; accept either
+  driver="amd_pstate"
+  pstate_supported=true
+elif [ -r "$scaling_f" ]; then
+  # fallback: read scaling_driver and normalise
+  rawdrv=$(cat "$scaling_f" 2>/dev/null || true)
+  case "$rawdrv" in
+  *intel*)
+    driver="intel_pstate"
+    pstate_supported=true
+    ;;
+  *amd*)
+    driver="amd_pstate"
+    pstate_supported=true
+    ;;
+  *) driver="$rawdrv" ;;
+  esac
 fi
-# Clone tpm
-git clone https://github.com/tmux-plugins/tpm ~/.config/tmux/plugins/tpm
 
-sudo env hardware="$hardware" extra="$extra" username="$username" bash <<'EOF'
-  dracut --force
-  sed -i 's/^#GRUB_DISABLE_OS_PROBER=false/GRUB_DISABLE_OS_PROBER=false/' /etc/default/grub
-  grub2-mkconfig -o /boot/grub2/grub.cfg
+# Kernel parameter to encourage pstate driver mode on next boot (set only when pstate is supported)
+pstate_param=""
+if [ "$pstate_supported" = true ]; then
+  if [ "$driver" = "intel_pstate" ]; then
+    # prefer 'active' for AC; we'll keep TLP switching to 'passive' on BAT to allow schedutil there.
+    pstate_param="intel_pstate=active"
+  elif [ "$driver" = "amd_pstate" ]; then
+    # amd_pstate supports active/passive/guided depending on kernel; active is a reasonable default.
+    pstate_param="amd_pstate=active"
+  fi
+fi
 
-  # User setup
-  if [[ "$hardware" == "hardware" ]]; then
-      usermod -aG wheel,video,audio,lp,scanner,kvm,libvirt,docker "$username"
+# Write base TLP config (safe defaults; adjust values below if you want more aggressive perf)
+if [[ "$extra" == "laptop" ]]; then
+  cat >/etc/tlp.conf <<EOF
+# Generated by installer - baseline TLP config
+PLATFORM_PROFILE_ON_AC=performance
+PLATFORM_PROFILE_ON_BAT=low-power
+
+# PCIe ASPM: prefer default on AC (don't force performance), aggressive on battery
+PCIE_ASPM_ON_AC=default
+PCIE_ASPM_ON_BAT=powersupersave
+
+USB_AUTOSUSPEND=1
+USB_EXCLUDE_BTUSB=0
+USB_EXCLUDE_PHONE=1
+
+# Runtime PM (use new name)
+RUNTIME_PM_ON_AC=on
+RUNTIME_PM_ON_BAT=auto
+RUNTIME_PM_DRIVER_DENYLIST="amdgpu nouveau nvidia"
+
+WIFI_PWR_ON_AC=off
+WIFI_PWR_ON_BAT=on
+
+SOUND_POWER_SAVE_ON_AC=0
+SOUND_POWER_SAVE_ON_BAT=1
+
+DISK_APM_LEVEL_ON_AC="254 254"
+DISK_APM_LEVEL_ON_BAT="128 128"
+
+# Per-disk IO scheduler: use mq-deadline as safe default (leave kernel default with 'keep')
+DISK_IOSCHED="none mq-deadline kyber bfq"
+
+SATA_LINKPWR_ON_AC=max_performance
+SATA_LINKPWR_ON_BAT=min_power
+
+# Charging thresholds (only functional if tlp-rdw and hardware support)
+START_CHARGE_THRESH_BAT0=40
+STOP_CHARGE_THRESH_BAT0=80
+EOF
+
+  # CPU-specific settings by driver
+  if [ "$driver" = "intel_pstate" ]; then
+    # Use 'active' for AC (intel internal algorithms), use 'passive' on BAT so schedutil can be selected
+    cat >>/etc/tlp.conf <<EOF
+# Intel pstate tuning
+CPU_DRIVER_OPMODE_ON_AC=active
+CPU_DRIVER_OPMODE_ON_BAT=passive
+CPU_SCALING_GOVERNOR_ON_AC=performance
+CPU_SCALING_GOVERNOR_ON_BAT=schedutil
+CPU_ENERGY_PERF_POLICY_ON_AC=performance
+CPU_ENERGY_PERF_POLICY_ON_BAT=balance_power
+CPU_BOOST_ON_AC=1
+CPU_BOOST_ON_BAT=0
+EOF
+
+  elif [ "$driver" = "amd_pstate" ]; then
+    # For AMD: prefer active when the new energy/CPP features exist, otherwise fall back to using schedutil
+    if [ -f /sys/devices/system/cpu/cpufreq/policy0/energy_performance_preference ]; then
+      cat >>/etc/tlp.conf <<EOF
+# AMD pstate with energy perf preference support
+CPU_DRIVER_OPMODE_ON_AC=active
+CPU_DRIVER_OPMODE_ON_BAT=active
+CPU_SCALING_GOVERNOR_ON_AC=performance
+CPU_SCALING_GOVERNOR_ON_BAT=powersave
+CPU_ENERGY_PERF_POLICY_ON_AC=performance
+CPU_ENERGY_PERF_POLICY_ON_BAT=power
+CPU_BOOST_ON_AC=1
+CPU_BOOST_ON_BAT=0
+EOF
+    else
+      cat >>/etc/tlp.conf <<EOF
+# AMD pstate older kernels - keep schedutil
+CPU_DRIVER_OPMODE_ON_AC=passive
+CPU_DRIVER_OPMODE_ON_BAT=passive
+CPU_SCALING_GOVERNOR_ON_AC=schedutil
+CPU_SCALING_GOVERNOR_ON_BAT=schedutil
+CPU_BOOST_ON_AC=1
+CPU_BOOST_ON_BAT=0
+EOF
+    fi
+
   else
-      usermod -aG wheel,video,audio,lp "$username"
+    # Generic fallback: use schedutil both AC/BAT
+    cat >>/etc/tlp.conf <<EOF
+# Generic CPUfreq fallback
+CPU_DRIVER_OPMODE_ON_AC=passive
+CPU_DRIVER_OPMODE_ON_BAT=passive
+CPU_SCALING_GOVERNOR_ON_AC=schedutil
+CPU_SCALING_GOVERNOR_ON_BAT=schedutil
+CPU_BOOST_ON_AC=1
+CPU_BOOST_ON_BAT=0
+EOF
   fi
+fi
 
-  # Sudo Configuration
-  echo "%wheel ALL=(ALL) ALL" >/etc/sudoers.d/wheel
-  echo "Defaults timestamp_timeout=-1" >/etc/sudoers.d/timestamp
-  chmod 440 /etc/sudoers.d/wheel /etc/sudoers.d/timestamp
+dracut --force
+extra_params="fsck.repair=yes zswap.enabled=0"
+if [ -n "$pstate_param" ]; then
+  all_params="$pstate_param $extra_params"
+else
+  all_params="$extra_params"
+fi
+# echo "GRUB_CMDLINE_LINUX=\"$all_params\"" >>/etc/default/grub
+echo "GRUB_DISABLE_OS_PROBER=false" >>/etc/default/grub
+sed -i 's/\b\(rhgb\|quiet\)\b//g' /etc/default/grub
+sed -i "s/^\(GRUB_CMDLINE_LINUX=\"[^\"]*\)/\1 $all_params/" /etc/default/grub
+# sed -i 's/^#GRUB_DISABLE_OS_PROBER=false/GRUB_DISABLE_OS_PROBER=false/' /etc/default/grub
+grub2-mkconfig -o /boot/efi/EFI/fedora/grub.cfg
 
-  # Root .config
-  mkdir -p ~/.config ~/.local/state/bash ~/.local/state/zsh
-  echo '[[ -f ~/.bashrc ]] && . ~/.bashrc' >~/.bash_profile
-  touch ~/.local/state/zsh/history ~/.local/state/bash/history
-  ln -sf /home/$username/Projects/personal/dotfiles/.bashrc ~/.bashrc 2>/dev/null || true
-  ln -sf /home/$username/Projects/personal/dotfiles/.zshrc ~/.zshrc 2>/dev/null || true
-  ln -sf /home/$username/Projects/personal/dotfiles/.config/nvim/ ~/.config
+# Sudo Configuration
+echo "%wheel ALL=(ALL) ALL" >/etc/sudoers.d/wheel
+echo "Defaults timestamp_timeout=-1" >/etc/sudoers.d/timestamp
+echo "Defaults pwfeedback" >/etc/sudoers.d/pwfeedback
+echo 'Defaults env_keep += "SYSTEMD_EDITOR XDG_RUNTIME_DIR WAYLAND_DISPLAY DBUS_SESSION_BUS_ADDRESS WAYLAND_SOCKET"' >/etc/sudoers.d/wayland
+chmod 440 /etc/sudoers.d/*
+# User setup
+if [[ "$hardware" == "hardware" ]]; then
+  usermod -aG wheel,video,audio,lp,scanner,kvm,libvirt "$username"
+else
+  usermod -aG wheel,video,audio,lp,docker "$username"
+fi
 
-  # Setup QT theme
-  THEME_SRC="/home/$username/Projects/personal/GruvboxQT/"
-  THEME_DEST="/usr/share/Kvantum/Gruvbox"
-  mkdir -p "$THEME_DEST"
-  cp "$THEME_SRC/gruvbox-kvantum.kvconfig" "$THEME_DEST/Gruvbox.kvconfig" 2>/dev/null || true
-  cp "$THEME_SRC/gruvbox-kvantum.svg" "$THEME_DEST/Gruvbox.svg" 2>/dev/null || true
+# firewalld setup
+# firewall-cmd --set-default-zone=public
+# Lan and ssh only lan
+firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address="192.168.0.0/24" accept'
+# cups deny
+firewall-cmd --permanent --add-rich-rule='rule family="ipv4" port port="631" protocol="tcp" reject'
+# Create and assign libvirt zone
+firewall-cmd --permanent --new-zone=libvirt
+firewall-cmd --permanent --zone=libvirt --add-interface=virbr0
+# Allow DHCP and DNS only in libvirt zone
+firewall-cmd --permanent --zone=libvirt --add-service=dhcp
+firewall-cmd --permanent --zone=libvirt --add-service=dns
+# Allow DHCP (ports 67, 68 UDP) and DNS (53 UDP and TCP)
+# firewall-cmd --permanent --zone=libvirt --add-port=67/udp # DHCP server (dnsmasq)
+# firewall-cmd --permanent --zone=libvirt --add-port=68/udp # DHCP client (if needed)
+# firewall-cmd --permanent --zone=libvirt --add-port=53/udp # DNS UDP
+# firewall-cmd --permanent --zone=libvirt --add-port=53/tcp # DNS TCP
+# Enable masquerading for routed traffic (NAT)
+firewall-cmd --permanent --add-masquerade
+firewall-cmd --permanent --remove-service=dhcpv6-client
+firewall-cmd --set-log-denied=all
+sed -i -E 's/^#?\s*LogDenied=.*/LogDenied=all/' /etc/firewalld/firewalld.conf
+firewall-cmd --reload
+systemctl enable firewalld
+echo 'net.ipv4.ip_forward = 1' | tee -a /etc/sysctl.d/99-firewalld.conf
+sysctl --system
+sed -i -E 's/^#?\s*interface=.*/interface=virbr0/; s/^#?\s*bind-interfaces.*/bind-interfaces/' /etc/dnsmasq.conf
 
-  # Install CachyOS Ananicy Rules
-  ANANICY_RULES_SRC="/home/$username/Downloads/ananicy-rules"
-  mkdir -p /etc/ananicy.d
+tee /etc/sysctl.d/99-hardening.conf >/dev/null <<'EOF'
+# networking
+net.ipv4.conf.all.rp_filter = 1
+net.ipv4.conf.default.rp_filter = 1
+net.ipv4.conf.all.send_redirects = 0
+net.ipv4.conf.default.send_redirects = 0
+net.ipv4.ip_forward = 0
 
-  cp -r "$ANANICY_RULES_SRC/00-default" /etc/ananicy.d/ 2>/dev/null || true
-  cp "$ANANICY_RULES_SRC/"*.rules /etc/ananicy.d/ 2>/dev/null || true
-  cp "$ANANICY_RULES_SRC/00-cgroups.cgroups" /etc/ananicy.d/ 2>/dev/null || true
-  cp "$ANANICY_RULES_SRC/00-types.types" /etc/ananicy.d/ 2>/dev/null || true
-  cp "$ANANICY_RULES_SRC/ananicy.conf" /etc/ananicy.d/ 2>/dev/null || true
+# kernel hardening
+kernel.kptr_restrict = 2
 
-  chmod -R 644 /etc/ananicy.d/*
-  chmod 755 /etc/ananicy.d/00-default
+# file protections
+fs.protected_fifos = 2
 
-  # Firefox policy
-  mkdir -p /etc/firefox/policies
-  ln -sf "/home/$username/Projects/personal/dotfiles/policies.json" /etc/firefox/policies/policies.json 2>/dev/null || true
-
-  # tldr wiki setup
-  curl -L "https://raw.githubusercontent.com/filiparag/wikiman/master/Makefile" -o "wikiman-makefile"
-  make -f ./wikiman-makefile source-tldr
-  make -f ./wikiman-makefile source-install
-  make -f ./wikiman-makefile clean
-
-  # zram config
-  mkdir -p /etc/systemd/zram-generator.conf.d
-  printf "[zram0]\nzram-size=min(ram/2,4096)\ncompression-algorithm=zstd\nswap-priority=100\nfs-type=swap\n"| tee /etc/systemd/zram-generator.conf.d/00-zram.conf > /dev/null
-
-  # services
-  # rfkill unblock bluetooth
-  # modprobe btusb || true
-  systemctl enable NetworkManager NetworkManager-dispatcher crond ananicy-cpp
-  if [[ "$hardware" == "hardware" ]]; then
-      systemctl enable fstrim.timer acpid libvirtd.socket cups ipp-usb docker.socket
-      if [[ "$extra" == "laptop" || "$extra" == "bluetooth" ]]; then
-          systemctl enable bluetooth
-      fi
-      if [[ "$extra" == "laptop" ]]; then
-          systemctl enable tlp
-      fi
-  fi
-  systemctl mask systemd-rfkill systemd-rfkill.socket
-  systemctl disable NetworkManager-wait-online.service systemd-networkd.service systemd-resolved getty@tty2
-
-  # prevent networkmanager from using systemd-resolved
-  mkdir -p /etc/networkmanager/conf.d
-  printf "[main]\nsystemd-resolved=false\n" | sudo tee /etc/networkmanager/conf.d/no-systemd-resolved.conf
-
-  # firewalld setup
-  # firewall-cmd --set-default-zone=public
-  firewall-cmd --permanent --remove-service=dhcpv6-client
-  firewall-cmd --permanent --add-service=http
-  firewall-cmd --permanent --add-service=https
-  # firewall-cmd --permanent --add-service=ssh
-  firewall-cmd --permanent --add-service=dns
-  firewall-cmd --permanent --add-service=dhcp
-  firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address="192.168.0.0/24" accept'
-  firewall-cmd --set-log-denied=all
-  # Create and assign a zone for virbr0
-  firewall-cmd --permanent --new-zone=libvirt
-  firewall-cmd --permanent --zone=libvirt --add-interface=virbr0
-  # Allow DHCP (ports 67, 68 UDP) and DNS (53 UDP)
-  # firewall-cmd --permanent --zone=libvirt --add-port=67/udp
-  # firewall-cmd --permanent --zone=libvirt --add-port=68/udp
-  # firewall-cmd --permanent --zone=libvirt --add-port=53/udp
-  # Enable masquerading for routed traffic (NAT)
-  firewall-cmd --permanent --add-masquerade
-  firewall-cmd --reload
-  systemctl enable firewalld
-  # echo 'net.ipv4.ip_forward = 1' | tee -a /etc/sysctl.d/99-firewalld.conf
-  # sysctl -p /etc/sysctl.d/99-firewalld.conf
+# bpf jit harden (if present)
+net.core.bpf_jit_harden = 2
 EOF
 
-# Configure static IP, gateway, and custom DNS
-sudo tee /etc/NetworkManager/conf.d/dns.conf >/dev/null <<EOF
-[main]
-dns=none
-systemd-resolved=false
+# A anacron job
+echo "30 5 trash-empty-job runuser -u piyush -- /usr/bin/trash-empty" >>/etc/anacrontab
+
+sh <(curl -L https://nixos.org/nix/install) --daemon --yes
+flatpak --system remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+flatpak --system install -y org.gtk.Gtk3theme.Adwaita-dark
+su - piyush -c '
+  mkdir -p ~/Downloads ~/Desktop ~/Public ~/Templates ~/Videos ~/Pictures/Screenshots/temp ~/.config
+  mkdir -p ~/Documents/personal/default ~/Documents/projects/work ~/Documents/projects/personal ~/Documents/personal/wiki
+  mkdir -p ~/.local/bin ~/.cache/cargo-target ~/.local/state/bash ~/.local/state/zsh ~/.local/share/wineprefixes
+  touch ~/.local/state/bash/history ~/.local/state/zsh/history
+
+  echo todo.txt > ~/Documents/personal/wiki/index.txt
+  echo 1. Write some todos > ~/Documents/personal/wiki/todo.txt
+  echo "if [ -z \"\$WAYLAND_DISPLAY\" ] && [ \"\$(tty)\" = \"/dev/tty1\" ]; then
+    exec sway
+  fi" >> ~/.bash_profile
+
+  git clone https://github.com/zedonix/scripts.git ~/Documents/personal/default/scripts
+  git clone https://github.com/zedonix/dotfiles.git ~/Documents/personal/default/dotfiles
+  git clone https://github.com/zedonix/debsetup.git ~/Documents/personal/default/debsetup
+  git clone https://github.com/zedonix/notes.git ~/Documents/personal/default/notes
+  git clone https://github.com/zedonix/GruvboxGtk.git ~/Documents/personal/default/GruvboxGtk
+  git clone https://github.com/zedonix/GruvboxQT.git ~/Documents/personal/default/GruvboxQT
+
+  cp ~/Documents/personal/default/dotfiles/.config/sway/archLogo.png ~/Pictures/
+  cp ~/Documents/personal/default/dotfiles/.config/sway/debLogo.png ~/Pictures/
+  cp ~/Documents/personal/default/dotfiles/pics/* ~/Pictures/
+  ln -sf ~/Documents/personal/default/dotfiles/.bashrc ~/.bashrc
+  ln -sf ~/Documents/personal/default/dotfiles/.zshrc ~/.zshrc
+  ln -sf ~/Documents/personal/default/dotfiles/.XCompose ~/.XCompose
+
+  for link in ~/Documents/personal/default/dotfiles/.config/*; do
+    ln -sf $link ~/.config/
+  done
+  for link in ~/Documents/personal/default/dotfiles/copy/*; do
+    cp -r $link ~/.config/
+  done
+  for link in ~/Documents/personal/default/scripts/bin/*; do
+    ln -sf $link ~/.local/bin/
+  done
+  git clone https://github.com/tmux-plugins/tpm ~/.config/tmux/plugins/tpm
+  zoxide add /home/piyush/Documents/personal/default/debsetup
+  source ~/.bashrc
+
+  # Iosevka
+  mkdir -p ~/.local/share/fonts/iosevka
+  cd ~/.local/share/fonts/iosevka
+  curl -LO https://github.com/ryanoasis/nerd-fonts/releases/latest/download/IosevkaTerm.zip
+  unzip IosevkaTerm.zip
+  rm IosevkaTerm.zip
+
+  rustup default stable
+  docker create --name omni-tools --restart no -p 1024:80 iib0011/omni-tools:latest
+  docker create --name bentopdf --restart no -p 1025:8080 bentopdf/bentopdf:latest
+  docker create --name convertx --restart no -p 1026:3000 -v ./data:/app/data ghcr.io/c4illin/convertx
+  flatpak override --user --env=GTK_THEME=Adwaita-dark --env=QT_STYLE_OVERRIDE=Adwaita-Dark
+'
+
+if [[ "$hardware" == "hardware" ]]; then
+  su - piyush -c '
+    flatpak install -y flathub com.github.wwmm.easyeffects
+    flatpak install -y flathub no.mifi.losslesscut
+    flatpak install -y flathub com.obsproject.Studio
+  '
+fi
+if [[ "$extra" == "laptop" ]]; then
+  su - piyush -c '
+    flatpak install -y flathub com.github.d4nj1.tlpui
+    flatpak install -y nl.brixit.powersupply
+  '
+fi
+
+# Root dots
+mkdir -p ~/.config ~/.local/state/bash ~/.local/state/zsh
+echo '[[ -f ~/.bashrc ]] && . ~/.bashrc' >~/.bash_profile
+touch ~/.local/state/zsh/history ~/.local/state/bash/history
+ln -sf /home/piyush/Documents/personal/default/dotfiles/nix.conf /etc/nix/nix.conf
+ln -sf /home/piyush/Documents/personal/default/dotfiles/.bashrc ~/.bashrc
+ln -sf /home/piyush/Documents/personal/default/dotfiles/.zshrc ~/.zshrc
+ln -sf /home/piyush/Documents/personal/default/dotfiles/.config/starship.toml ~/.config
+ln -sf /home/piyush/Documents/personal/default/dotfiles/.config/nvim/ ~/.config
+
+source ~/.bashrc
+systemctl restart nix-daemon
+
+su - piyush -c '
+  nix profile add \
+    nixpkgs#bemoji \
+    nixpkgs#lazydocker \
+    nixpkgs#upscaler \
+    nixpkgs#onlyoffice-desktopeditors \
+    nixpkgs#wayland-pipewire-idle-inhibit \
+    nixpkgs#networkmanager_dmenu \
+    nixpkgs#newsraft \
+    nixpkgs#go \
+    nixpkgs#uv \
+    nixpkgs#opencode \
+    nixpkgs#javaPackages.compiler.temurin-bin.jre-17
+  # nix build nixpkgs#opencode --no-link --no-substitute
+'
+nix profile add nixpkgs#yazi nixpkgs#eza nixpkgs#starship
+
+# npm install -g tree-sitter-cli
+
+# ananicy-cpp
+# git clone --depth 1 https://gitlab.com/ananicy-cpp/ananicy-cpp.git
+# cd ananicy-cpp
+# cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_SYSTEMD=ON -DUSE_BPF_PROC_IMPL=ON -DWITH_BPF=ON
+# cmake --build build --target ananicy-cpp
+# cmake --install build --component Runtime
+
+# neovim
+curl -LO "https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.tar.gz"
+rm -rf /opt/nvim-linux-x86_64
+tar -C /opt -xzf nvim-linux-x86_64.tar.gz
+ln -sf /opt/nvim-linux-x86_64/bin/nvim /usr/local/bin/nvim
+
+# Setup gruvbox theme
+THEME_SRC="/home/piyush/Documents/personal/default/GruvboxQT"
+THEME_DEST="/usr/share/Kvantum/Gruvbox"
+mkdir -p "$THEME_DEST"
+cp "$THEME_SRC/gruvbox-kvantum.kvconfig" "$THEME_DEST/Gruvbox.kvconfig"
+cp "$THEME_SRC/gruvbox-kvantum.svg" "$THEME_DEST/Gruvbox.svg"
+
+THEME_SRC="/home/piyush/Documents/personal/default/GruvboxGtk"
+THEME_DEST="/usr/share"
+cp -r "$THEME_SRC/themes/Gruvbox-Material-Dark" "$THEME_DEST/themes"
+cp -r "$THEME_SRC/icons/Gruvbox-Material-Dark" "$THEME_DEST/icons"
+
+# Anancy-cpp rules
+git clone --depth=1 https://github.com/RogueScholar/ananicy.git
+git clone --depth=1 https://github.com/CachyOS/ananicy-rules.git
+mkdir -p /etc/ananicy.d/roguescholar /etc/ananicy.d/zz-cachyos
+cp -r ananicy/ananicy.d/* /etc/ananicy.d/roguescholar/
+cp -r ananicy-rules/00-default/* /etc/ananicy.d/zz-cachyos/
+cp -r ananicy-rules/00-types.types /etc/ananicy.d/zz-cachyos/
+cp -r ananicy-rules/00-cgroups.cgroups /etc/ananicy.d/zz-cachyos/
+tee /etc/ananicy.d/ananicy.conf >/dev/null <<'EOF'
+check_freq = 15
+cgroup_load = false
+type_load = true
+rule_load = true
+apply_nice = true
+apply_latnice = true
+apply_ionice = true
+apply_sched = true
+apply_oom_score_adj = true
+apply_cgroup = true
+loglevel = info
+log_applied_rule = false
+cgroup_realtime_workaround = false
 EOF
-sudo systemctl restart NetworkManager
 
-# Flatpak setup
-flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+# Firefox policy
+mkdir -p /etc/firefox/policies
+ln -sf "/home/piyush/Documents/personal/default/dotfiles/policies.json" /etc/firefox/policies/policies.json
 
-# A cron job
-(
-  crontab -l 2>/dev/null
-  echo "*/5 * * * * battery-alert.sh"
-  echo "@daily $(which trash-empty) 30"
-) | crontab -
+# zram config
+# Get total memory in MiB
+TOTAL_MEM=$(awk '/MemTotal/ {print int($2 / 1024)}' /proc/meminfo)
+ZRAM_SIZE=$((TOTAL_MEM / 2))
+
+# Create zram config
+mkdir -p /etc/systemd/zram-generator.conf.d
+{
+  echo "[zram0]"
+  echo "zram-size = ${ZRAM_SIZE}"
+  echo "compression-algorithm = zstd"
+  echo "swap-priority = 100"
+  echo "fs-type = swap"
+} >/etc/systemd/zram-generator.conf.d/00-zram.conf
+
+# Services
+# rfkill unblock bluetooth
+# modprobe btusb || true
+if [[ "$hardware" == "hardware" ]]; then
+  systemctl enable fstrim.timer acpid libvirtd.socket cups ipp-usb docker.socket
+  systemctl disable docker.service dnsmasq
+fi
+if [[ "$extra" == "laptop" || "$extra" == "bluetooth" ]]; then
+  systemctl enable bluetooth
+fi
+if [[ "$extra" == "laptop" ]]; then
+  systemctl enable tlp
+fi
+systemctl enable NetworkManager NetworkManager-dispatcher ananicy-cpp
+systemctl mask systemd-rfkill systemd-rfkill.socket
+systemctl disable NetworkManager-wait-online.service
+
+# cleanup
+sudo dnf remove plymouth

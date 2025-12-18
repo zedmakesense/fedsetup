@@ -1,40 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
-SRC_DIR="$HOME/Documents/default/GruvboxGtk"
-DEST_DIR="$HOME/.local/share/themes"
-THEME_NAME="Gruvbox-Dark"
-THEME_DIR="${DEST_DIR}/${THEME_NAME}"
-rm -rf "${THEME_DIR}"
-mkdir -p "${THEME_DIR}"
-# --- GTK2 ---
-mkdir -p "${THEME_DIR}/gtk-2.0"
-cp -r "${SRC_DIR}/main/gtk-2.0/common/"*'.rc' "${THEME_DIR}/gtk-2.0" 2>/dev/null || true
-cp -r "${SRC_DIR}/assets/gtk-2.0/assets-common-Dark" "${THEME_DIR}/gtk-2.0/assets" 2>/dev/null || true
-cp -r "${SRC_DIR}/assets/gtk-2.0/assets-Dark/"*.png "${THEME_DIR}/gtk-2.0/assets" 2>/dev/null || true
-# --- GTK3 ---
-mkdir -p "${THEME_DIR}/gtk-3.0"
-cp -r "${SRC_DIR}/assets/gtk/scalable" "${THEME_DIR}/gtk-3.0/assets" 2>/dev/null || true
-if [ -f "${SRC_DIR}/main/gtk-3.0/gtk-Dark.scss" ]; then
-    sassc -M -t expanded "${SRC_DIR}/main/gtk-3.0/gtk-Dark.scss" "${THEME_DIR}/gtk-3.0/gtk.css"
-    cp "${THEME_DIR}/gtk-3.0/gtk.css" "${THEME_DIR}/gtk-3.0/gtk-dark.css"
-fi
-# --- GTK4 ---
-mkdir -p "${THEME_DIR}/gtk-4.0"
-cp -r "${SRC_DIR}/assets/gtk/scalable" "${THEME_DIR}/gtk-4.0/assets" 2>/dev/null || true
-if [ -f "${SRC_DIR}/main/gtk-4.0/gtk-Dark.scss" ]; then
-    sassc -M -t expanded "${SRC_DIR}/main/gtk-4.0/gtk-Dark.scss" "${THEME_DIR}/gtk-4.0/gtk.css"
-    cp "${THEME_DIR}/gtk-4.0/gtk.css" "${THEME_DIR}/gtk-4.0/gtk-dark.css"
-fi
-# --- index.theme ---
-cat >"${THEME_DIR}/index.theme" <<EOF
-[Desktop Entry]
-Type=X-GNOME-Metatheme
-Name=${THEME_NAME}
-Comment=Gruvbox Dark GTK Theme
-EOF
-
-gsettings set org.gnome.desktop.interface gtk-theme 'Gruvbox-Dark'
+kvantummanager --set Gruvbox
+gsettings set org.gnome.desktop.interface gtk-theme 'Gruvbox-Material-Dark'
 gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark"
 gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
 declare -A gsettings_keys=(
@@ -48,26 +16,95 @@ for key in "${!gsettings_keys[@]}"; do
   subkey="${key#* }"
   value="${gsettings_keys[$key]}"
 
-  if gsettings describe "$schema" "$subkey" &>/dev/null; then
+  if gsettings describe "$schema" "$subkey" >/dev/null; then
     gsettings set "$schema" "$subkey" "$value"
   fi
 done
 
 # Firefox user.js linking
-echo "/home/$USER/Projects/personal/dotfiles/ublock.txt" | wl-copy
+echo -n "/home/$USER/Documents/personal/default/dotfiles/ublock.txt" | wl-copy
 gh auth login
-for dir in ~/.mozilla/firefox/*.default-release/; do
-  [ -d "$dir" ] || continue
-  ln -sf ~/Projects/personal/dotfiles/user.js "$dir/user.js"
-  break
-done
+dir=$(echo ~/.mozilla/firefox/*.default-esr)
+ln -sf ~/Documents/personal/default/dotfiles/user.js "$dir/user.js"
+cp -f ~/Documents/personal/default/dotfiles/book* "$dir/bookmarkbackups/"
 
-# Libvirt setup
-if pacman -Qq libvirt &>/dev/null; then
-  sudo virsh net-autostart default
-  sudo virsh net-start default
-fi
+# Configure static IP, gateway, and custom DNS
+# sudo tee /etc/systemd/resolved.conf <<EOF
+# [Resolve]
+# DNS=8.8.8.8 8.8.4.4
+# EOF
+# sudo ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+# sudo tee /etc/NetworkManager/conf.d/dns.conf <<EOF
+# [main]
+# dns=none
+# systemd-resolved=false
+# EOF
+# sudo tee /etc/resolv.conf <<EOF
+# nameserver 1.1.1.1
+# nameserver 1.0.0.1
+# EOF
+# sudo systemctl restart NetworkManager
 
+bemoji --download all &
 # Nvim tools install
 foot -e nvim +MasonToolsInstall &
 foot -e sudo nvim +MasonToolsInstall &
+foot -e tmux &
+
+# Libvirt setup
+NEW="/home/piyush/Documents/libvirt"
+TMP="/tmp/default-pool.xml"
+
+# wrapper so we don't accidentally pass a quoted command string to sudo
+virsh_connect() { sudo virsh --connect qemu:///system "$@"; }
+
+if rpm -q libvirt-daemon &>/dev/null; then
+  # ensure default network is autostarted if present; ignore errors if already set
+  virsh_connect net-autostart default 2>/dev/null || true
+  virsh_connect net-start default 2>/dev/null || true
+
+  sudo mkdir -p "$NEW"
+  sudo chown -R root:libvirt "$NEW"
+  sudo chmod -R 2775 "$NEW"
+
+  # remove any existing pools that point to this path (except keep 'default' for now)
+  while IFS= read -r p; do
+    [ -z "$p" ] && continue
+    if virsh_connect pool-dumpxml "$p" 2>/dev/null | grep -q "<path>${NEW}</path>"; then
+      if [ "$p" != "default" ]; then
+        virsh_connect pool-destroy "$p" || true
+        virsh_connect pool-undefine "$p" || true
+      fi
+    fi
+  done < <(virsh_connect pool-list --all --name 2>/dev/null || true)
+
+  # if a 'default' storage pool exists, replace it with our path
+  if virsh_connect pool-list --all 2>/dev/null | awk 'NR>2{print $1}' | grep -qx default; then
+    virsh_connect pool-destroy default 2>/dev/null || true
+    virsh_connect pool-undefine default 2>/dev/null || true
+  fi
+
+  # write pool XML with variable expansion
+  cat <<EOF | sudo tee "$TMP" >/dev/null
+<pool type='dir'>
+  <name>default</name>
+  <target><path>${NEW}</path></target>
+</pool>
+EOF
+
+  # define, start, refresh and autostart the pool
+  virsh_connect pool-define "$TMP" || true
+  virsh_connect pool-build default 2>/dev/null || true
+  virsh_connect pool-start default 2>/dev/null || true
+  virsh_connect pool-refresh default 2>/dev/null || true
+  virsh_connect pool-autostart default 2>/dev/null || true
+
+  # ensure files under NEW/images are world-readable where appropriate
+  sudo find "${NEW}" -type d -exec sudo chmod 2775 {} + || true
+  sudo find "${NEW}" -type f -exec sudo chmod 0644 {} + || true
+
+  echo "Libvirt pool configured at ${NEW}"
+else
+  echo "libvirt-daemon not installed; skip configuration" >&2
+  exit 1
+fi

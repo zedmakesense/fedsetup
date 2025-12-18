@@ -382,6 +382,7 @@ systemctl restart nix-daemon
 su - piyush -c '
   nix profile add \
     nixpkgs#hyprpicker \
+    nixpkgs#lxsession \
     nixpkgs#bemoji \
     nixpkgs#lazydocker \
     nixpkgs#upscaler \
@@ -397,7 +398,7 @@ su - piyush -c '
     nixpkgs#javaPackages.compiler.temurin-bin.jre-17
   # nix build nixpkgs#opencode --no-link --no-substitute
 '
-nix profile add nixpkgs#yazi nixpkgs#eza nixpkgs#starship nixpkgs#neovim
+nix profile add nixpkgs#yazi nixpkgs#eza nixpkgs#starship nixpkgs#neovim nixpkgs#poweralertd
 
 # npm install -g tree-sitter-cli
 

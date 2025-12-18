@@ -82,7 +82,7 @@ dnf -y copr enable erizur/firefox-esr
 dnf makecache
 
 # pacstrap of fedora
-xargs dnf install -y <pkglist.txt
+xargs dnf install -y --exclude=openh264 <pkglist.txt
 
 # Tlp setup
 # Robust detection: prefer explicit pstate driver dirs if present, fallback to scaling_driver text

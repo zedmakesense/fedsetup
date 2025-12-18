@@ -296,7 +296,6 @@ EOF
 # A anacron job
 echo "30 5 trash-empty-job runuser -u piyush -- /usr/bin/trash-empty" >>/etc/anacrontab
 
-sh <(curl -L https://nixos.org/nix/install) --daemon --yes
 flatpak --system remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 flatpak --system install -y org.gtk.Gtk3theme.Adwaita-dark
 su - piyush -c '
@@ -379,26 +378,25 @@ ln -sf /home/piyush/Documents/personal/default/dotfiles/.config/nvim/ ~/.config
 source ~/.bashrc
 systemctl restart nix-daemon
 
-su - piyush -c '
-  nix profile add \
-    nixpkgs#hyprpicker \
-    nixpkgs#lxsession \
-    nixpkgs#bemoji \
-    nixpkgs#lazydocker \
-    nixpkgs#upscaler \
-    nixpkgs#cliphist \
-    nixpkgs#wl-clip-persist \
-    nixpkgs#onlyoffice-desktopeditors \
-    nixpkgs#wayland-pipewire-idle-inhibit \
-    nixpkgs#networkmanager_dmenu \
-    nixpkgs#newsraft \
-    nixpkgs#go \
-    nixpkgs#uv \
-    nixpkgs#opencode \
-    nixpkgs#javaPackages.compiler.temurin-bin.jre-17
-  # nix build nixpkgs#opencode --no-link --no-substitute
-'
-nix profile add nixpkgs#yazi nixpkgs#eza nixpkgs#starship nixpkgs#neovim nixpkgs#poweralertd
+nix profile add \
+  nixpkgs#hyprpicker \
+  nixpkgs#lxsession \
+  nixpkgs#bemoji \
+  nixpkgs#lazydocker \
+  nixpkgs#upscaler \
+  nixpkgs#cliphist \
+  nixpkgs#wl-clip-persist \
+  nixpkgs#onlyoffice-desktopeditors \
+  nixpkgs#wayland-pipewire-idle-inhibit \
+  nixpkgs#networkmanager_dmenu \
+  nixpkgs#newsraft \
+  nixpkgs#opencode \
+  nixpkgs#javaPackages.compiler.temurin-bin.jre-17 \
+  nixpkgs#yazi \
+  nixpkgs#eza \
+  nixpkgs#starship \
+  nixpkgs#poweralertd
+# nix build nixpkgs#opencode --no-link --no-substitute
 
 # npm install -g tree-sitter-cli
 

@@ -247,13 +247,13 @@ else
 fi
 
 # firewalld setup
-firewall-cmd --set-default-zone=public
+# firewall-cmd --set-default-zone=public
 # Allow LAN (192.168.0.0/24) and SSH from LAN only
 firewall-cmd --permanent --zone=public --add-source=192.168.0.0/24
-firewall-cmd --permanent --zone=public --add-service=ssh
+# firewall-cmd --permanent --zone=public --add-service=ssh
 # Deny CUPS in public zone
-firewall-cmd --permanent --zone=public --add-service=cups --remove
-firewall-cmd --permanent --zone=public --add-port=631/tcp --remove
+firewall-cmd --permanent --zone=public --remove-service=cups
+firewall-cmd --permanent --zone=public --remove-port=631/tcp
 # Create libvirt zone and assign virtual bridge
 firewall-cmd --permanent --new-zone=libvirt
 firewall-cmd --permanent --zone=libvirt --add-interface=virbr0

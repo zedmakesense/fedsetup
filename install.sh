@@ -78,8 +78,6 @@ dnf upgrade --refresh
 ## Adding repos
 dnf install -y https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-"$(rpm -E %fedora)".noarch.rpm
 dnf install -y https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-"$(rpm -E %fedora)".noarch.rpm
-dnf -y copr enable solopasha/hyprland
-dnf -y copr enable tschmitz/ananicy-cpp
 dnf -y copr enable erizur/firefox-esr
 dnf makecache
 
@@ -249,31 +247,32 @@ else
 fi
 
 # firewalld setup
-# firewall-cmd --set-default-zone=public
-# Lan and ssh only lan
-firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address="192.168.0.0/24" accept'
-# cups deny
-firewall-cmd --permanent --add-rich-rule='rule family="ipv4" port port="631" protocol="tcp" reject'
-# Create and assign libvirt zone
+firewall-cmd --set-default-zone=public
+# Allow LAN (192.168.0.0/24) and SSH from LAN only
+firewall-cmd --permanent --zone=public --add-source=192.168.0.0/24
+firewall-cmd --permanent --zone=public --add-service=ssh
+# Deny CUPS in public zone
+firewall-cmd --permanent --zone=public --add-service=cups --remove
+firewall-cmd --permanent --zone=public --add-port=631/tcp --remove
+# Create libvirt zone and assign virtual bridge
 firewall-cmd --permanent --new-zone=libvirt
 firewall-cmd --permanent --zone=libvirt --add-interface=virbr0
-# Allow DHCP and DNS only in libvirt zone
+# Only allow DHCP and DNS for libvirt guests
 firewall-cmd --permanent --zone=libvirt --add-service=dhcp
 firewall-cmd --permanent --zone=libvirt --add-service=dns
-# Allow DHCP (ports 67, 68 UDP) and DNS (53 UDP and TCP)
-# firewall-cmd --permanent --zone=libvirt --add-port=67/udp # DHCP server (dnsmasq)
-# firewall-cmd --permanent --zone=libvirt --add-port=68/udp # DHCP client (if needed)
-# firewall-cmd --permanent --zone=libvirt --add-port=53/udp # DNS UDP
-# firewall-cmd --permanent --zone=libvirt --add-port=53/tcp # DNS TCP
-# Enable masquerading for routed traffic (NAT)
-firewall-cmd --permanent --add-masquerade
-firewall-cmd --permanent --remove-service=dhcpv6-client
+# Enable NAT (masquerade) for routed traffic
+firewall-cmd --permanent --zone=libvirt --add-masquerade
+# Log all denied packets
 firewall-cmd --set-log-denied=all
 sed -i -E 's/^#?\s*LogDenied=.*/LogDenied=all/' /etc/firewalld/firewalld.conf
+# Remove unused services
+firewall-cmd --permanent --remove-service=dhcpv6-client
 firewall-cmd --reload
 systemctl enable firewalld
-echo 'net.ipv4.ip_forward = 1' | tee -a /etc/sysctl.d/99-firewalld.conf
+# Enable IP forwarding for NAT
+echo 'net.ipv4.ip_forward = 1' | tee /etc/sysctl.d/99-firewalld.conf
 sysctl --system
+# Bind dnsmasq to virbr0 only
 sed -i -E 's/^#?\s*interface=.*/interface=virbr0/; s/^#?\s*bind-interfaces.*/bind-interfaces/' /etc/dnsmasq.conf
 
 tee /etc/sysctl.d/99-hardening.conf >/dev/null <<'EOF'
@@ -382,6 +381,7 @@ systemctl restart nix-daemon
 
 su - piyush -c '
   nix profile add \
+    nixpkgs#hyprpicker \
     nixpkgs#bemoji \
     nixpkgs#lazydocker \
     nixpkgs#upscaler \

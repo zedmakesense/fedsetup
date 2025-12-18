@@ -79,7 +79,6 @@ dnf upgrade --refresh
 dnf install -y https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-"$(rpm -E %fedora)".noarch.rpm
 dnf install -y https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-"$(rpm -E %fedora)".noarch.rpm
 dnf -y copr enable solopasha/hyprland
-dnf -y copr enable maximizerr/SwayAura
 dnf -y copr enable tschmitz/ananicy-cpp
 dnf -y copr enable erizur/firefox-esr
 dnf makecache
@@ -386,6 +385,8 @@ su - piyush -c '
     nixpkgs#bemoji \
     nixpkgs#lazydocker \
     nixpkgs#upscaler \
+    nixpkgs#cliphist \
+    nixpkgs#wl-clip-persist \
     nixpkgs#onlyoffice-desktopeditors \
     nixpkgs#wayland-pipewire-idle-inhibit \
     nixpkgs#networkmanager_dmenu \

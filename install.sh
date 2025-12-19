@@ -235,7 +235,6 @@ grub2-mkconfig -o /boot/grub2/grub.cfg
 
 # Sudo Configuration
 echo "%wheel ALL=(ALL) ALL" >/etc/sudoers.d/wheel
-echo "Defaults timestamp_timeout=-1" >/etc/sudoers.d/timestamp
 echo "Defaults pwfeedback" >/etc/sudoers.d/pwfeedback
 echo 'Defaults env_keep += "SYSTEMD_EDITOR XDG_RUNTIME_DIR WAYLAND_DISPLAY DBUS_SESSION_BUS_ADDRESS WAYLAND_SOCKET"' >/etc/sudoers.d/wayland
 chmod 440 /etc/sudoers.d/*
@@ -281,7 +280,7 @@ net.ipv4.conf.all.rp_filter = 1
 net.ipv4.conf.default.rp_filter = 1
 net.ipv4.conf.all.send_redirects = 0
 net.ipv4.conf.default.send_redirects = 0
-net.ipv4.ip_forward = 0
+# net.ipv4.ip_forward = 0
 
 # kernel hardening
 kernel.kptr_restrict = 2
@@ -298,6 +297,7 @@ echo "30 5 trash-empty-job runuser -u piyush -- /usr/bin/trash-empty" >>/etc/ana
 
 flatpak --system remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 flatpak --system install -y org.gtk.Gtk3theme.Adwaita-dark
+systemctl start docker.service
 su - piyush -c '
   mkdir -p ~/Downloads ~/Desktop ~/Public ~/Templates ~/Videos ~/Pictures/Screenshots/temp ~/.config
   mkdir -p ~/Documents/personal/default ~/Documents/projects/work ~/Documents/projects/personal ~/Documents/personal/wiki
@@ -344,7 +344,7 @@ su - piyush -c '
   unzip IosevkaTerm.zip
   rm IosevkaTerm.zip
 
-  rustup default stable
+  rustup-init -y
   docker create --name omni-tools --restart no -p 1024:80 iib0011/omni-tools:latest
   docker create --name bentopdf --restart no -p 1025:8080 bentopdf/bentopdf:latest
   docker create --name convertx --restart no -p 1026:3000 -v ./data:/app/data ghcr.io/c4illin/convertx
@@ -468,7 +468,7 @@ mkdir -p /etc/systemd/zram-generator.conf.d
 # modprobe btusb || true
 if [[ "$hardware" == "hardware" ]]; then
   systemctl enable fstrim.timer acpid libvirtd.socket cups ipp-usb docker.socket
-  systemctl disable docker.service dnsmasq
+  systemctl disable dnsmasq
 fi
 if [[ "$extra" == "laptop" || "$extra" == "bluetooth" ]]; then
   systemctl enable bluetooth
@@ -481,4 +481,4 @@ systemctl mask systemd-rfkill systemd-rfkill.socket
 systemctl disable NetworkManager-wait-online.service
 
 # cleanup
-sudo dnf remove plymouth
+dnf remove plymouth

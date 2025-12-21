@@ -74,7 +74,8 @@ dnf -y copr enable erizur/firefox-esr
 dnf makecache
 
 # pacstrap of fedora
-xargs dnf install -y --exclude=openh264 <pkglist.txt
+dnf config-manager setopt fedora-cisco-openh264.enabled=0 # cuz fuck cisco
+xargs dnf install -y <pkglist.txt
 
 # Tlp setup
 # Robust detection: prefer explicit pstate driver dirs if present, fallback to scaling_driver text

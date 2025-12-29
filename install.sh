@@ -304,7 +304,6 @@ su - piyush -c '
 '
 rm /usr/share/fonts/google-noto-color-emoji-fonts/Noto-COLRv1.ttf
 wget https://github.com/googlefonts/noto-emoji/raw/main/fonts/NotoColorEmoji.ttf -O /usr/share/fonts/google-noto-color-emoji-fonts/NotoColorEmoji.ttf
-echo "after this?"
 
 # Root dots
 mkdir -p ~/.config ~/.local/state/bash ~/.local/state/zsh
@@ -318,23 +317,22 @@ ln -sf /home/piyush/Documents/personal/default/dotfiles/.config/nvim/ ~/.config
 
 systemctl restart nix-daemon
 
-su - piyush -c '
-  nix profile add \
-    nixpkgs#hyprpicker \
-    nixpkgs#bemoji \
-    nixpkgs#lazydocker \
-    nixpkgs#upscaler \
-    nixpkgs#cliphist \
-    nixpkgs#wl-clip-persist \
-    nixpkgs#onlyoffice-desktopeditors \
-    nixpkgs#networkmanager_dmenu \
-    nixpkgs#newsraft \
-    nixpkgs#caligula \
-    nixpkgs#opencode \
-    nixpkgs#javaPackages.compiler.temurin-bin.jre-17 \
-    nixpkgs#poweralertd
-  # nix build nixpkgs#opencode --no-link --no-substitute
-'
+sudo -iu piyush nix profile add \
+  nixpkgs#hyprpicker \
+  nixpkgs#bemoji \
+  nixpkgs#lazydocker \
+  nixpkgs#upscaler \
+  nixpkgs#cliphist \
+  nixpkgs#wl-clip-persist \
+  nixpkgs#onlyoffice-desktopeditors \
+  nixpkgs#networkmanager_dmenu \
+  nixpkgs#newsraft \
+  nixpkgs#caligula \
+  nixpkgs#opencode \
+  nixpkgs#javaPackages.compiler.temurin-bin.jre-17 \
+  nixpkgs#poweralertd
+# nix build nixpkgs#opencode --no-link --no-substitute
+
 nix profile add nixpkgs#yazi nixpkgs#starship nixpkgs#eza
 
 git clone --depth 1 https://gitlab.com/ananicy-cpp/ananicy-cpp.git

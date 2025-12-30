@@ -178,15 +178,13 @@ if [ -n "$pstate_param" ]; then
 else
   all_params="$extra_params"
 fi
-default_kernel=$(grubby --default-kernel)
-grubby --update-kernel="$default_kernel" --args="$all_params"
-grubby --update-kernel="$default_kernel" --remove-args="rhgb quiet"
+sed -i 's/[[:space:]]*\b\(rhgb\|quiet\)\b[[:space:]]*/ /g' /etc/default/grub
+sed -i "s/^\(GRUB_CMDLINE_LINUX=\"[^\"]*\)/\1 $all_params/" /etc/default/grub
 sed -i 's/^#GRUB_TIMEOUT=5/GRUB_TIMEOUT=2/' /etc/default/grub
 echo "GRUB_DISABLE_OS_PROBER=false" >>/etc/default/grub
 echo "GRUB_GFXMODE=text" >>/etc/default/grub
 echo "GRUB_GFXPAYLOAD_LINUX=text" >>/etc/default/grub
 echo "GRUB_SAVEDEFAULT=true" >>/etc/default/grub
-# sed -i 's/^#GRUB_DISABLE_OS_PROBER=false/GRUB_DISABLE_OS_PROBER=false/' /etc/default/grub
 grub2-mkconfig -o /boot/grub2/grub.cfg
 
 # Sudo Configuration

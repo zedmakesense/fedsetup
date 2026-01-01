@@ -252,7 +252,7 @@ flatpak --system install -y org.gtk.Gtk3theme.Adwaita-dark
 systemctl start docker.service
 su - piyush -c '
   mkdir -p ~/Downloads ~/Desktop ~/Public ~/Templates ~/Videos ~/Pictures/Screenshots/temp ~/.config
-  mkdir -p ~/Documents/personal/default ~/Documents/projects ~/Documents/personal/wiki
+  mkdir -p ~/Documents/personal/default ~/Documents/projects ~/Documents/personal/wiki ~/Documents/personal/wiki/draw
   mkdir -p ~/.local/bin ~/.cache/cargo-target ~/.local/state/bash ~/.local/state/zsh ~/.local/share/wineprefixes
   touch ~/.local/state/bash/history ~/.local/state/zsh/history
 
@@ -333,6 +333,11 @@ sudo -iu piyush nix profile add \
 # nix build nixpkgs#opencode --no-link --no-substitute
 
 nix profile add nixpkgs#yazi nixpkgs#starship nixpkgs#eza
+
+REPO="jgraph/drawio-desktop"
+curl -s "https://api.github.com/repos/$REPO/releases/latest" |
+  grep -oE 'https://[^"]+x86_64[^"]+\.rpm' |
+  xargs -n 1 wget
 
 git clone --depth 1 https://gitlab.com/ananicy-cpp/ananicy-cpp.git
 cd ananicy-cpp

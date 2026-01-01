@@ -334,6 +334,9 @@ sudo -iu piyush nix profile add \
 
 nix profile add nixpkgs#yazi nixpkgs#starship nixpkgs#eza
 
+wget https://github.com/burnt0rice/excalidraw-desktop/releases/download/v0.1.0/excalidraw-desktop-0.1.0-1.x86_64.rpm
+dnf install ./excalidraw-desktop-0.1.0-1.x86_64.rpm
+
 git clone --depth 1 https://gitlab.com/ananicy-cpp/ananicy-cpp.git
 cd ananicy-cpp
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_SYSTEMD=ON -DUSE_BPF_PROC_IMPL=ON -DWITH_BPF=ON

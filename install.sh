@@ -251,7 +251,7 @@ flatpak --system install -y org.gtk.Gtk3theme.Adwaita-dark
 systemctl start docker.service
 su - piyush -c '
   mkdir -p ~/Downloads ~/Desktop ~/Public ~/Templates ~/Videos ~/Pictures/Screenshots/temp ~/.config
-  mkdir -p ~/Documents/personal/default ~/Documents/projects ~/Documents/personal/wiki ~/Documents/personal/wiki/draw
+  mkdir -p ~/Documents/personal/default ~/Documents/projects ~/Documents/personal/wiki
   mkdir -p ~/.local/bin ~/.cache/cargo-target ~/.local/state/bash ~/.local/state/zsh ~/.local/share/wineprefixes
   touch ~/.local/state/bash/history ~/.local/state/zsh/history
 

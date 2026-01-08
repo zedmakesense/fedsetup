@@ -86,6 +86,9 @@ if [[ "$hardware" == "hardware" ]]; then
   # venv/bin/pip install -r requirements.txt
   # venv/bin/python3 main.py install libndk
   # venv/bin/python3 main.py install libhoudini
+  #
+  # sudo XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" WAYLAND_DISPLAY="$WAYLAND_DISPLAY" waydroid shell -- sh /sdcard/Android/data/xtr.keymapper/files/xtMapper.sh --wayland-client
+  #
   # flatpak install -y flathub no.mifi.losslesscut
   # flatpak install -y flathub com.obsproject.Studio
 fi

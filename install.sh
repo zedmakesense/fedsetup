@@ -70,7 +70,7 @@ dnf upgrade --refresh
 ## Adding repos
 dnf install -y https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-"$(rpm -E %fedora)".noarch.rpm
 dnf install -y https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-"$(rpm -E %fedora)".noarch.rpm
-dnf -y copr enable erizur/firefox-esr
+# dnf -y copr enable erizur/firefox-esr
 dnf makecache
 
 dnf config-manager setopt fedora-cisco-openh264.enabled=0 # cuz fuck cisco
@@ -324,7 +324,7 @@ sudo -iu piyush nix profile add \
   nixpkgs#wl-clip-persist \
   nixpkgs#onlyoffice-desktopeditors \
   nixpkgs#networkmanager_dmenu \
-  nixpkgs#newsraft \
+  nixpkgs#firefox-esr \
   nixpkgs#swappy \
   nixpkgs#caligula \
   nixpkgs#opencode \
@@ -357,7 +357,7 @@ THEME_DEST="/usr/share"
 cp -r "$THEME_SRC/themes/Gruvbox-Material-Dark" "$THEME_DEST/themes"
 cp -r "$THEME_SRC/icons/Gruvbox-Material-Dark" "$THEME_DEST/icons"
 
-# Anancy-cpp rules
+# Ananicy-cpp rules
 git clone --depth=1 https://github.com/RogueScholar/ananicy.git
 git clone --depth=1 https://github.com/CachyOS/ananicy-rules.git
 mkdir -p /etc/ananicy.d/roguescholar /etc/ananicy.d/zz-cachyos
@@ -399,6 +399,13 @@ mkdir -p /etc/systemd/zram-generator.conf.d
   echo "swap-priority = 100"
   echo "fs-type = swap"
 } >/etc/systemd/zram-generator.conf.d/00-zram.conf
+
+# docker fix
+tee /etc/systemd/system/docker.socket.d/override.conf >/dev/null <<'EOF'
+[Unit]
+After=firewalld.service
+Requires=firewalld.service
+EOF
 
 # Services
 # rfkill unblock bluetooth

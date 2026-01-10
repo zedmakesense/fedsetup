@@ -327,17 +327,12 @@ sudo -iu piyush nix profile add \
   nixpkgs#swappy \
   nixpkgs#caligula \
   nixpkgs#opencode \
+  nixpkgs#drawio \
   nixpkgs#javaPackages.compiler.temurin-bin.jre-17 \
   nixpkgs#poweralertd
 # nix build nixpkgs#opencode --no-link --no-substitute
 
 nix profile add nixpkgs#yazi nixpkgs#starship nixpkgs#eza
-
-REPO="jgraph/drawio-desktop"
-curl -s "https://api.github.com/repos/$REPO/releases/latest" |
-  jq -r '.assets[].browser_download_url' |
-  grep -E 'x86_64.*\.rpm$' |
-  xargs -n1 wget
 
 git clone --depth 1 https://gitlab.com/ananicy-cpp/ananicy-cpp.git
 cd ananicy-cpp

@@ -327,11 +327,11 @@ sudo -iu piyush nix profile add \
   nixpkgs#swappy \
   nixpkgs#caligula \
   nixpkgs#opencode \
-  nixpkgs#drawio \
   nixpkgs#javaPackages.compiler.temurin-bin.jre-17 \
   nixpkgs#poweralertd
-# nix build nixpkgs#opencode --no-link --no-substitute
-
+# sudo -iu piyush nix build nixpkgs#opencode --no-link --no-substitute
+export NIXPKGS_ALLOW_UNFREE=1
+sudo -iu piyush nix profile add nixpkgs#drawio --impure
 nix profile add nixpkgs#yazi nixpkgs#starship nixpkgs#eza
 
 git clone --depth 1 https://gitlab.com/ananicy-cpp/ananicy-cpp.git

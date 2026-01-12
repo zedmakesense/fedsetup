@@ -66,7 +66,7 @@ gpgcheck=True
 EOF
 dnf clean all
 dnf makecache
-dnf upgrade --refresh
+dnf upgrade -y --refresh
 ## Adding repos
 dnf install -y https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-"$(rpm -E %fedora)".noarch.rpm
 dnf install -y https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-"$(rpm -E %fedora)".noarch.rpm

@@ -70,7 +70,12 @@ dnf upgrade -y --refresh
 ## Adding repos
 dnf install -y https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-"$(rpm -E %fedora)".noarch.rpm
 dnf install -y https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-"$(rpm -E %fedora)".noarch.rpm
+dnf install -y https://download.onlyoffice.com/install/desktop/editors/linux/onlyoffice-desktopeditors.x86_64.rpm
 dnf makecache
+
+dnf copr enable erizur/firefox-esr
+dnf copr enable solopasha/hyprland
+dnf copr enable atim/starship
 
 dnf config-manager setopt fedora-cisco-openh264.enabled=0 # cuz fuck cisco
 xargs dnf install -y <pkglist.txt
@@ -274,13 +279,17 @@ su - piyush -c '
   git clone https://github.com/zedonix/fedsetup.git ~/Documents/projects/default/fedsetup
   git clone https://github.com/zedonix/notes.git ~/Documents/projects/default/notes
   git clone https://github.com/zedonix/GruvboxTheme.git ~/Documents/projects/default/GruvboxTheme
+  git clone https://github.com/firecat53/networkmanager-dmenu.git /tmp/networkmanager-dmenu
 
+  cp /tmp/networkmanager-dmenu/networkmanager_dmenu ~/.local/bin/networkmanager-dmenu
   cp ~/Documents/projects/default/dotfiles/.config/sway/archLogo.png ~/Pictures/
   cp ~/Documents/projects/default/dotfiles/.config/sway/debLogo.png ~/Pictures/
   cp ~/Documents/projects/default/dotfiles/pics/* ~/Pictures/
   ln -sf ~/Documents/projects/default/dotfiles/.bashrc ~/.bashrc
   ln -sf ~/Documents/projects/default/dotfiles/.zshrc ~/.zshrc
   ln -sf ~/Documents/projects/default/dotfiles/.XCompose ~/.XCompose
+
+  chmod +x ~/.local/bin/networkmanager-dmenu
 
   for link in ~/Documents/projects/default/dotfiles/.config/*; do
     ln -sf $link ~/.config/
@@ -304,6 +313,8 @@ su - piyush -c '
   rm IosevkaTerm.zip
 
   rustup-init -y
+  curl -fsSL https://opencode.ai/install | bash
+
   docker create --name omni-tools --restart no -p 127.0.0.1:1024:80 iib0011/omni-tools:latest
   docker create --name bentopdf --restart no -p 127.0.0.1:1025:8080 bentopdf/bentopdf:latest
   docker create --name convertx --restart no -p 127.0.0.1:1026:3000 -v ./data:/app/data ghcr.io/c4illin/convertx
@@ -325,25 +336,31 @@ ln -sf /home/piyush/Documents/projects/default/dotfiles/.config/nvim/ ~/.config
 nix registry add --registry /etc/nix/registry.json nixpkgs github:NixOS/nixpkgs/nixos-25.11
 systemctl restart nix-daemon
 sudo -iu piyush nix profile add \
-  nixpkgs#firefox-esr \
-  nixpkgs#hyprpicker \
   nixpkgs#bemoji \
-  nixpkgs#lazydocker \
+  nixpkgs#google-java-format \
+  nixpkgs#jdt-language-server \
+  nixpkgs#poweralertd \
   nixpkgs#upscaler \
-  nixpkgs#cliphist \
-  nixpkgs#wl-clip-persist \
-  nixpkgs#onlyoffice-desktopeditors \
-  nixpkgs#networkmanager_dmenu \
-  nixpkgs#swappy \
-  nixpkgs#caligula \
-  nixpkgs#opencode \
-  nixpkgs#javaPackages.compiler.temurin-bin.jre-17 \
-  nixpkgs#poweralertd
-# sudo -iu piyush nix build nixpkgs#opencode --no-link --no-substitute
-sudo -iu piyush env NIXPKGS_ALLOW_UNFREE=1 nix profile add nixpkgs#drawio --impure
-nix profile add nixpkgs#yazi nixpkgs#starship nixpkgs#eza
+  nixpkgs#wl-clip-persist
+
+if [[ "$extra" == "laptop" ]]; then
+  sudo -iu piyush nix profile add nixpkgs#powersupply
+fi
+
+cargo install stylua tex-fmt caligula yazi-build eza
+uv tool install debugpy
+pnpm add -g markdownlint-cli2 htmlhint eslint_d stylelint @fsouza/prettierd
+luarocks install luacheck
+go install github.com/jesseduffield/lazydocker@latest
+go install go.senan.xyz/cliphist@latest
 
 sudo -iu piyush bemoji --download all
+
+REPO="jgraph/drawio-desktop"
+curl -s "https://api.github.com/repos/$REPO/releases/latest" |
+  jq -r '.assets[].browser_download_url' |
+  grep -E 'x86_64.*\.rpm$' |
+  xargs -n1 wget
 
 git clone --depth 1 https://gitlab.com/ananicy-cpp/ananicy-cpp.git
 cd ananicy-cpp

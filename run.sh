@@ -50,8 +50,4 @@ if [[ "$hardware" == "hardware" ]]; then
 fi
 if [[ "$extra" == "laptop" ]]; then
   flatpak install -y flathub com.github.d4nj1.tlpui
-  flatpak install -y nl.brixit.powersupply
 fi
-
-foot -e nvim +MasonToolsInstall &
-foot -e sudo nvim +MasonToolsInstall &

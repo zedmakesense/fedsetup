@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -uo pipefail
+set -euo pipefail
 
 if [ "$(id -u)" -ne 0 ]; then
   echo "This script must be run as root"

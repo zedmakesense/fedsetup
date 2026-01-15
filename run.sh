@@ -40,7 +40,7 @@ done
 
 echo -n "/home/$USER/Documents/projects/default/dotfiles/ublock.txt" | wl-copy
 gh auth login
-dir=$(echo ~/.mozilla/firefox/*.default)
+dir=$(echo ~/.mozilla/firefox-esr/*.default)
 ln -sf ~/Documents/projects/default/dotfiles/user.js "$dir/user.js"
 cp -f ~/Documents/projects/default/dotfiles/book* "$dir/bookmarkbackups/"
 

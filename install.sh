@@ -63,13 +63,25 @@ tee -a /etc/dnf/dnf.conf <<EOF
 fastestmirror=True
 deltarpm=True
 gpgcheck=True
+
+[fedora-cisco-openh264]
+enabled=0
+EOF
+tee /etc/yum.repos.d/adoptium.repo > /dev/null <<'EOF'
+[Adoptium]
+name=Adoptium
+baseurl=https://packages.adoptium.net/artifactory/rpm/fedora/$releasever/$basearch
+enabled=1
+gpgcheck=1
+gpgkey=https://packages.adoptium.net/artifactory/api/gpg/key/public
 EOF
 dnf clean all
 dnf makecache
-dnf config-manager setopt fedora-cisco-openh264.enabled=0 # cuz fuck cisco
+# dnf config-manager setopt fedora-cisco-openh264.enabled=0 # cuz fuck cisco
 dnf upgrade -y --refresh
 dnf install -y https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-"$(rpm -E %fedora)".noarch.rpm
 dnf install -y https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-"$(rpm -E %fedora)".noarch.rpm
+dnf makecache --disablerepo='*' --enablerepo=Adoptium
 dnf makecache
 
 dnf copr enable -y erizur/firefox-esr

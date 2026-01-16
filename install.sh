@@ -62,21 +62,21 @@ enabled=1
 gpgcheck=1
 gpgkey=https://packages.adoptium.net/artifactory/api/gpg/key/public
 EOF
-dnf clean all
-dnf makecache
 # dnf config-manager setopt fedora-cisco-openh264.enabled=0 # cuz fuck cisco
 dnf upgrade -y --refresh
-dnf install -y https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-"$(rpm -E %fedora)".noarch.rpm
-dnf install -y https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-"$(rpm -E %fedora)".noarch.rpm
-dnf makecache --disablerepo='*' --enablerepo=Adoptium
-dnf makecache
+dnf install -y \
+  https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-"$(rpm -E %fedora)".noarch.rpm \
+  https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-"$(rpm -E %fedora)".noarch.rpm
+dnf makecache --enablerepo=Adoptium
 
-dnf copr enable -y erizur/firefox-esr
-dnf copr enable -y solopasha/hyprland
-dnf copr enable -y atim/starship
+dnf copr enable -y \
+  erizur/firefox-esr \
+  solopasha/hyprland \
+  atim/starship
 
 xargs dnf install -y <pkglist.txt
-dnf install -y https://download.onlyoffice.com/install/desktop/editors/linux/onlyoffice-desktopeditors.x86_64.rpm
+dnf clean all
+dnf makecache
 
 if [[ "$extra" == "laptop" ]]; then
   cat <<'EOF' >/etc/tlp.d/01-custom.conf
@@ -356,7 +356,7 @@ if [[ "$extra" == "laptop" ]]; then
   sudo -iu piyush nix profile add nixpkgs#powersupply
 fi
 
-sudo -iu piyush bemoji --download all
+sudo -iu piyush bemoji --download all >/dev/null 2>&1 || true
 
 REPO="jgraph/drawio-desktop"
 curl -s "https://api.github.com/repos/$REPO/releases/latest" |

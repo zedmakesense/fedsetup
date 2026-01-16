@@ -199,9 +199,9 @@ firewall-cmd --permanent --zone=home --add-source=192.168.0.0/24
 # firewall-cmd --permanent --zone=home --remove-service=mdns
 # firewall-cmd --permanent --zone=public --remove-service=ssh
 # firewall-cmd --zone=public --permanent --add-rich-rule='rule family="ipv4" source address="192.168.0.0/24" service name="ssh" accept'
-firewall-cmd --permanent --zone=public --remove-service=cups
+# firewall-cmd --permanent --zone=public --remove-service=cups
 firewall-cmd --permanent --zone=public --remove-service=mdns
-firewall-cmd --permanent --zone=public --remove-port=631/tcp
+# firewall-cmd --permanent --zone=public --remove-port=631/tcp
 if [[ "$hardware" == "hardware" ]]; then
   firewall-cmd --permanent --zone=libvirt --add-interface=virbr0
   firewall-cmd --permanent --zone=libvirt --add-service=dhcp

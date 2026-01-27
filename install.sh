@@ -312,6 +312,7 @@ su - piyush -c '
   rm IosevkaTerm.zip
 
   rustup-init -y
+  cargo install clipvault --locked
   pnpm add -g opencode-ai
 
   podman create --name omni-tools --restart=no -p 127.0.0.1:1024:80 docker.io/iib0011/omni-tools:latest
@@ -442,5 +443,6 @@ systemctl mask systemd-rfkill systemd-rfkill.socket
 systemctl disable NetworkManager-wait-online.service acpid acpid.socket
 mkdir -p /etc/systemd/logind.conf.d
 printf '[Login]\nHandlePowerKey=ignore\n' > /etc/systemd/logind.conf.d/90-ignore-power.conf
+# HandlePowerKeyLongPress
 
 dnf remove -y plymouth libbpf-devel elfutils-libelf-devel bpftool lzip

@@ -278,11 +278,11 @@ su - piyush -c '
     exec sway
   fi" >> ~/.bash_profile
 
-  git clone https://github.com/zedonix/scripts.git ~/Documents/projects/default/scripts
-  git clone https://github.com/zedonix/dotfiles.git ~/Documents/projects/default/dotfiles
-  git clone https://github.com/zedonix/fedsetup.git ~/Documents/projects/default/fedsetup
-  git clone https://github.com/zedonix/notes.git ~/Documents/projects/default/notes
-  git clone https://github.com/zedonix/GruvboxTheme.git ~/Documents/projects/default/GruvboxTheme
+  git clone https://github.com/zedmakesese/scripts.git ~/Documents/projects/default/scripts
+  git clone https://github.com/zedmakesese/dotfiles.git ~/Documents/projects/default/dotfiles
+  git clone https://github.com/zedmakesese/fedsetup.git ~/Documents/projects/default/fedsetup
+  git clone https://github.com/zedmakesese/notes.git ~/Documents/projects/default/notes
+  git clone https://github.com/zedmakesese/GruvboxTheme.git ~/Documents/projects/default/GruvboxTheme
 
   cp ~/Documents/projects/default/dotfiles/.config/sway/archLogo.png ~/Pictures/
   cp ~/Documents/projects/default/dotfiles/.config/sway/debLogo.png ~/Pictures/

@@ -266,7 +266,7 @@ EOF
 
 flatpak --system remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 flatpak --system install -y org.gtk.Gtk3theme.Adwaita-dark
-su - piyush -c '
+su - piyush -c 'bash -s' <<'EOF'
   mkdir -p ~/Downloads ~/Desktop ~/Public ~/Templates ~/Videos ~/Pictures/Screenshots/temp ~/.config
   mkdir -p ~/Documents/projects/default ~/Documents/projects ~/Documents/personal/wiki
   mkdir -p ~/.local/bin ~/.cache/cargo-target ~/.local/state/bash ~/.local/state/zsh ~/.local/share/wineprefixes
@@ -274,15 +274,25 @@ su - piyush -c '
 
   echo todo.txt > ~/Documents/personal/wiki/index.txt
   echo 1. Write some todos > ~/Documents/personal/wiki/todo.txt
-  echo "if [ -z \"\$WAYLAND_DISPLAY\" ] && [ \"\$(tty)\" = \"/dev/tty1\" ]; then
-    exec sway
-  fi" >> ~/.bash_profile
+  cat >> ~/.bash_profile <<'BASH'
+if [ -z "$WAYLAND_DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
+  exec sway
+fi
+BASH
 
   git clone https://github.com/zedmakesese/scripts.git ~/Documents/projects/default/scripts
   git clone https://github.com/zedmakesese/dotfiles.git ~/Documents/projects/default/dotfiles
   git clone https://github.com/zedmakesese/fedsetup.git ~/Documents/projects/default/fedsetup
   git clone https://github.com/zedmakesese/notes.git ~/Documents/projects/default/notes
   git clone https://github.com/zedmakesese/GruvboxTheme.git ~/Documents/projects/default/GruvboxTheme
+
+  mkdir -p ~/.local/share/nvim/java-debug
+  url=$(curl -fsSL 'https://open-vsx.org/api/vscjava/vscode-java-debug' | grep '"download"' | head -1 | sed -E 's/.*"download": *"([^"]+)".*/\1/')
+  file=${url##*/}
+  wget -c -O "$file" "$url"
+  unzip -o "$file" 'extension/server/com.microsoft.java.debug.plugin-*.jar' -d /tmp
+  mv /tmp/extension/server/com.microsoft.java.debug.plugin-*.jar ~/.local/share/nvim/java-debug/
+  rm -rf /tmp/extension
 
   cp ~/Documents/projects/default/dotfiles/.config/sway/archLogo.png ~/Pictures/
   cp ~/Documents/projects/default/dotfiles/.config/sway/debLogo.png ~/Pictures/
@@ -292,21 +302,21 @@ su - piyush -c '
   ln -sf ~/Documents/projects/default/dotfiles/.XCompose ~/.XCompose
 
   for link in ~/Documents/projects/default/dotfiles/.config/*; do
-    ln -sf $link ~/.config/
+    ln -sf "$link" ~/.config/
   done
   for link in ~/Documents/projects/default/dotfiles/copy/*; do
-    cp -r $link ~/.config/
+    cp -r "$link" ~/.config/
   done
   for link in ~/Documents/projects/default/scripts/bin/*; do
-    ln -sf $link ~/.local/bin/
+    ln -sf "$link" ~/.local/bin/
   done
   git clone https://github.com/tmux-plugins/tpm ~/.config/tmux/plugins/tpm
   /home/piyush/Documents/projects/default/dotfiles/.config/tmux/plugins/tpm/scripts/install_plugins.sh
   zoxide add /home/piyush/Documents/projects/default/fedsetup
   source ~/.bashrc
 
-  mkdir -p ~/.local/share/fonts/iosevka
   cd ~/.local/share/fonts/iosevka
+  mkdir -p ~/.local/share/fonts/iosevka
   curl -LO https://github.com/ryanoasis/nerd-fonts/releases/latest/download/IosevkaTerm.zip
   unzip IosevkaTerm.zip
   rm IosevkaTerm.zip
@@ -320,7 +330,7 @@ su - piyush -c '
   podman volume create convertx-data
   podman create --name convertx --restart=no -p 127.0.0.1:1026:3000 -v convertx-data:/app/data:Z ghcr.io/c4illin/convertx
   podman create --name excalidraw --restart=no -p 127.0.0.1:1027:80 docker.io/excalidraw/excalidraw:latest
-'
+EOF
 rm /usr/share/fonts/google-noto-color-emoji-fonts/Noto-COLRv1.ttf
 wget https://github.com/googlefonts/noto-emoji/raw/main/fonts/NotoColorEmoji.ttf -O /usr/share/fonts/google-noto-color-emoji-fonts/NotoColorEmoji.ttf
 
@@ -442,7 +452,7 @@ systemctl enable NetworkManager NetworkManager-dispatcher ananicy-cpp nix-daemon
 systemctl mask systemd-rfkill systemd-rfkill.socket
 systemctl disable NetworkManager-wait-online.service acpid acpid.socket
 mkdir -p /etc/systemd/logind.conf.d
-printf '[Login]\nHandlePowerKey=ignore\n' > /etc/systemd/logind.conf.d/90-ignore-power.conf
+printf '[Login]\nHandlePowerKey=ignore\n' >/etc/systemd/logind.conf.d/90-ignore-power.conf
 # HandlePowerKeyLongPress
 
 dnf remove -y plymouth libbpf-devel elfutils-libelf-devel bpftool lzip

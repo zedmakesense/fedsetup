@@ -78,9 +78,7 @@ dnf install -y \
   https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-"$(rpm -E %fedora)".noarch.rpm
 dnf makecache --enablerepo=Adoptium,wayscriber
 
-dnf copr enable -y \
-  erizur/firefox-esr \
-  solopasha/hyprland
+dnf copr enable -y erizur/firefox-esr solopasha/hyprland
 
 xargs dnf install -y <pkglist.txt
 dnf clean all

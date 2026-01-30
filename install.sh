@@ -438,7 +438,7 @@ mkdir -p /etc/systemd/zram-generator.conf.d
 # rfkill unblock bluetooth
 # modprobe btusb || true
 if [[ "$hardware" == "hardware" ]]; then
-  systemctl enable fstrim.timer acpid libvirtd.socket cups ipp-usb docker.socket
+  systemctl enable fstrim.timer libvirtd.socket cups ipp-usb docker.socket
   systemctl disable dnsmasq
 fi
 # if [[ "$extra" == "laptop" || "$extra" == "bluetooth" ]]; then
@@ -449,7 +449,7 @@ if [[ "$extra" == "laptop" ]]; then
 fi
 systemctl enable NetworkManager NetworkManager-dispatcher ananicy-cpp nix-daemon firewalld
 systemctl mask systemd-rfkill systemd-rfkill.socket
-systemctl disable NetworkManager-wait-online.service acpid acpid.socket
+systemctl disable NetworkManager-wait-online.service
 mkdir -p /etc/systemd/logind.conf.d
 printf '[Login]\nHandlePowerKey=ignore\n' >/etc/systemd/logind.conf.d/90-ignore-power.conf
 # HandlePowerKeyLongPress

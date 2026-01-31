@@ -54,9 +54,6 @@ gpgcheck=True
 [fedora-cisco-openh264]
 enabled=0
 EOF
-
-dnf upgrade -y --refresh
-
 tee /etc/yum.repos.d/adoptium.repo >/dev/null <<'EOF'
 [Adoptium]
 name=Adoptium
@@ -75,11 +72,14 @@ repo_gpgcheck=1
 gpgkey=https://wayscriber.com/rpm/RPM-GPG-KEY-wayscriber.asc
 EOF
 
-dnf clean all
 # dnf config-manager setopt fedora-cisco-openh264.enabled=0 # cuz fuck cisco
+dnf upgrade -y --refresh
 dnf install -y \
   https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-"$(rpm -E %fedora)".noarch.rpm \
   https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-"$(rpm -E %fedora)".noarch.rpm
+curl -fsSL https://wayscriber.com/rpm/RPM-GPG-KEY-wayscriber.asc -o /tmp/wayscriber.asc
+rpm --import /tmp/wayscriber.asc
+dnf clean all
 dnf makecache --enablerepo=Adoptium,wayscriber
 
 dnf copr enable -y erizur/firefox-esr
